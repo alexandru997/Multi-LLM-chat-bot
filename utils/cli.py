@@ -10,7 +10,7 @@ def parse_args():
         "--provider",
         choices=PROVIDERS,
         default="groq",
-        help=f"Choose the provider (default: groq)"
+        help="Choose the provider (default: groq)"
     )
 
     parser.add_argument(

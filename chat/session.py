@@ -1,5 +1,6 @@
-from providers.base import LLMProvider
+from providers.base import LLMProvider, ProviderError
 from chat.cost_tracker import CostTracker
+
 
 class ChatSession:
 
@@ -9,19 +10,17 @@ class ChatSession:
         self.system_prompt = system_prompt
         self.messages = []
 
-    def _estimate_tokens(self, text: str) -> int:
-        return len(text) // 4
-
     def chat(self, user_input: str):
         self.messages.append({"role": "user", "content": user_input})
+        try:
+            result = self.provider.stream_chat(self.messages, self.system_prompt)
+        except ProviderError as e:
+            print(f"[error] {e}")
+            self.messages.pop()
+            return
 
-        response = self.provider.stream_chat(self.messages, self.system_prompt)
-
-        self.messages.append({"role": "assistant", "content": response})
-
-        input_tokens = self._estimate_tokens(user_input)
-        output_tokens = self._estimate_tokens(response)
-        self.cost_tracker.add(input_tokens, output_tokens)
+        self.messages.append({"role": "assistant", "content": result.text})
+        self.cost_tracker.add(result.usage)
 
     def clear(self):
         self.messages = []
@@ -39,16 +38,16 @@ class ChatSession:
                 if not user_input:
                     continue
                 elif user_input == "/quit":
-                    print(self.cost_tracker.summary())
+                    print("\n" + self.cost_tracker.summary())
                     break
                 elif user_input == "/clear":
                     self.clear()
                 elif user_input == "/cost":
-                    print(self.cost_tracker.summary())
+                    print("\n" + self.cost_tracker.summary())
                 else:
                     print("\nAssistant: ", end="")
                     self.chat(user_input)
 
             except KeyboardInterrupt:
-                print(self.cost_tracker.summary())
+                print("\n" + self.cost_tracker.summary())
                 break
