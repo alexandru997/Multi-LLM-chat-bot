@@ -1,7 +1,8 @@
 import logging
-from typing import Any
+from typing import cast
 
-from groq import Groq, GroqError
+from groq import Groq, GroqError, Stream
+from groq.types.chat import ChatCompletionChunk
 
 from config import GROQ_API_KEY, MODELS
 from providers.base import ChatResult, LLMProvider, ProviderError, Usage
@@ -13,7 +14,7 @@ class GroqProvider(LLMProvider):
     def __init__(self) -> None:
         if not GROQ_API_KEY:
             raise ProviderError("GROQ_API_KEY is missing. Set it in .env")
-        self.client: Groq = Groq(api_key=GROQ_API_KEY)
+        self.client = Groq(api_key=GROQ_API_KEY)
         self._model: str = MODELS["groq"]
 
     @property
@@ -33,10 +34,13 @@ class GroqProvider(LLMProvider):
         all_messages.extend(messages)
 
         try:
-            stream: Any = self.client.chat.completions.create(
-                model=self._model,
-                messages=all_messages,  # type: ignore[arg-type]
-                stream=True,
+            stream = cast(
+                Stream[ChatCompletionChunk],
+                self.client.chat.completions.create(
+                    model=self._model,
+                    messages=all_messages,  # type: ignore[arg-type]
+                    stream=True,
+                ),
             )
 
             full_response = ""

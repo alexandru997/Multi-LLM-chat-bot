@@ -1,8 +1,12 @@
 import logging
-from typing import Any
 
 from google import genai
 from google.genai import errors as genai_errors
+from google.genai.types import (
+    ContentDict,
+    GenerateContentConfigDict,
+    GenerateContentResponseUsageMetadata,
+)
 
 from config import GEMINI_API_KEY, MODELS
 from providers.base import ChatResult, LLMProvider, ProviderError, Usage
@@ -14,7 +18,7 @@ class GeminiProvider(LLMProvider):
     def __init__(self) -> None:
         if not GEMINI_API_KEY:
             raise ProviderError("GEMINI_API_KEY is missing. Set it in .env")
-        self.client: Any = genai.Client(api_key=GEMINI_API_KEY)
+        self.client = genai.Client(api_key=GEMINI_API_KEY)
         self._model: str = MODELS["gemini"]
 
     @property
@@ -28,14 +32,19 @@ class GeminiProvider(LLMProvider):
     def stream_chat(
         self, messages: list[dict[str, str]], system_prompt: str = ""
     ) -> ChatResult:
-        history: list[dict[str, Any]] = []
+        history: list[ContentDict] = []
         for msg in messages[:-1]:
             role = "user" if msg["role"] == "user" else "model"
             history.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         last_message = messages[-1]["content"]
-        all_contents = history + [{"role": "user", "parts": [{"text": last_message}]}]
-        config = {"system_instruction": system_prompt} if system_prompt else None
+        all_contents: list[ContentDict] = [
+            *history,
+            {"role": "user", "parts": [{"text": last_message}]},
+        ]
+        config: GenerateContentConfigDict | None = (
+            {"system_instruction": system_prompt} if system_prompt else None
+        )
 
         try:
             stream = self.client.models.generate_content_stream(
@@ -45,7 +54,7 @@ class GeminiProvider(LLMProvider):
             )
 
             full_response = ""
-            usage_meta: Any = None
+            usage_meta: GenerateContentResponseUsageMetadata | None = None
 
             for chunk in stream:
                 text = chunk.text or ""
@@ -55,8 +64,11 @@ class GeminiProvider(LLMProvider):
                     usage_meta = chunk.usage_metadata
 
             print()
-            input_tokens = getattr(usage_meta, "prompt_token_count", 0) or 0
-            output_tokens = getattr(usage_meta, "candidates_token_count", 0) or 0
+            input_tokens = 0
+            output_tokens = 0
+            if usage_meta is not None:
+                input_tokens = usage_meta.prompt_token_count or 0
+                output_tokens = usage_meta.candidates_token_count or 0
 
             return ChatResult(
                 text=full_response,
