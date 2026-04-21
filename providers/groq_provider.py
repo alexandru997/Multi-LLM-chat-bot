@@ -1,15 +1,20 @@
+import logging
+from typing import Any
+
 from groq import Groq, GroqError
+
 from config import GROQ_API_KEY, MODELS
-from providers.base import LLMProvider, ChatResult, Usage, ProviderError
+from providers.base import ChatResult, LLMProvider, ProviderError, Usage
+
+logger = logging.getLogger(__name__)
 
 
 class GroqProvider(LLMProvider):
-
-    def __init__(self):
+    def __init__(self) -> None:
         if not GROQ_API_KEY:
             raise ProviderError("GROQ_API_KEY is missing. Set it in .env")
-        self.client = Groq(api_key=GROQ_API_KEY)
-        self._model = MODELS["groq"]
+        self.client: Groq = Groq(api_key=GROQ_API_KEY)
+        self._model: str = MODELS["groq"]
 
     @property
     def name(self) -> str:
@@ -19,16 +24,18 @@ class GroqProvider(LLMProvider):
     def model(self) -> str:
         return self._model
 
-    def stream_chat(self, messages: list[dict], system_prompt: str = "") -> ChatResult:
-        all_messages = []
+    def stream_chat(
+        self, messages: list[dict[str, str]], system_prompt: str = ""
+    ) -> ChatResult:
+        all_messages: list[dict[str, str]] = []
         if system_prompt:
             all_messages.append({"role": "system", "content": system_prompt})
         all_messages.extend(messages)
 
         try:
-            stream = self.client.chat.completions.create(
+            stream: Any = self.client.chat.completions.create(
                 model=self._model,
-                messages=all_messages,
+                messages=all_messages,  # type: ignore[arg-type]
                 stream=True,
             )
 
@@ -54,4 +61,5 @@ class GroqProvider(LLMProvider):
             )
 
         except GroqError as e:
+            logger.debug("Groq API failure", exc_info=True)
             raise ProviderError(f"Groq error: {e}") from e

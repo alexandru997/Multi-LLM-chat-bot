@@ -37,7 +37,9 @@ class LLMProvider(ABC):
         """Model ID currently in use for this provider."""
 
     @abstractmethod
-    def stream_chat(self, messages: list[dict], system_prompt: str = "") -> ChatResult:
+    def stream_chat(
+        self, messages: list[dict[str, str]], system_prompt: str = ""
+    ) -> ChatResult:
         """Send a chat turn, stream output, and return (text, usage).
 
         Raises ProviderError on any failure (network, quota, bad model, ...).

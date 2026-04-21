@@ -1,15 +1,19 @@
 import json
+import logging
+
 import requests
-from providers.base import LLMProvider, ChatResult, Usage, ProviderError
+
 from config import MODELS
+from providers.base import ChatResult, LLMProvider, ProviderError, Usage
+
+logger = logging.getLogger(__name__)
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 
 
 class OllamaProvider(LLMProvider):
-
-    def __init__(self):
-        self._model = MODELS["ollama"]
+    def __init__(self) -> None:
+        self._model: str = MODELS["ollama"]
 
     @property
     def name(self) -> str:
@@ -19,8 +23,10 @@ class OllamaProvider(LLMProvider):
     def model(self) -> str:
         return self._model
 
-    def stream_chat(self, messages: list[dict], system_prompt: str = "") -> ChatResult:
-        all_messages = []
+    def stream_chat(
+        self, messages: list[dict[str, str]], system_prompt: str = ""
+    ) -> ChatResult:
+        all_messages: list[dict[str, str]] = []
         if system_prompt:
             all_messages.append({"role": "system", "content": system_prompt})
         all_messages.extend(messages)
@@ -61,12 +67,16 @@ class OllamaProvider(LLMProvider):
             )
 
         except requests.exceptions.ConnectionError as e:
+            logger.debug("Ollama connection error", exc_info=True)
             raise ProviderError(
                 "Ollama is not running. Run 'ollama serve' in the terminal."
             ) from e
         except requests.exceptions.HTTPError as e:
+            logger.debug("Ollama HTTP error", exc_info=True)
             raise ProviderError(f"Ollama HTTP error: {e}") from e
         except requests.exceptions.Timeout as e:
+            logger.debug("Ollama timeout", exc_info=True)
             raise ProviderError("Ollama timed out.") from e
         except (json.JSONDecodeError, KeyError) as e:
+            logger.debug("Ollama malformed response", exc_info=True)
             raise ProviderError(f"Ollama returned malformed response: {e}") from e

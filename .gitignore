@@ -3,3 +3,13 @@
 __pycache__/
 *.pyc
 .idea/
+
+# Build artefacts from `pip install -e .`
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

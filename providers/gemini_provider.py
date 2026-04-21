@@ -1,16 +1,21 @@
+import logging
+from typing import Any
+
 from google import genai
 from google.genai import errors as genai_errors
+
 from config import GEMINI_API_KEY, MODELS
-from providers.base import LLMProvider, ChatResult, Usage, ProviderError
+from providers.base import ChatResult, LLMProvider, ProviderError, Usage
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(LLMProvider):
-
-    def __init__(self):
+    def __init__(self) -> None:
         if not GEMINI_API_KEY:
             raise ProviderError("GEMINI_API_KEY is missing. Set it in .env")
-        self.client = genai.Client(api_key=GEMINI_API_KEY)
-        self._model = MODELS["gemini"]
+        self.client: Any = genai.Client(api_key=GEMINI_API_KEY)
+        self._model: str = MODELS["gemini"]
 
     @property
     def name(self) -> str:
@@ -20,8 +25,10 @@ class GeminiProvider(LLMProvider):
     def model(self) -> str:
         return self._model
 
-    def stream_chat(self, messages: list[dict], system_prompt: str = "") -> ChatResult:
-        history = []
+    def stream_chat(
+        self, messages: list[dict[str, str]], system_prompt: str = ""
+    ) -> ChatResult:
+        history: list[dict[str, Any]] = []
         for msg in messages[:-1]:
             role = "user" if msg["role"] == "user" else "model"
             history.append({"role": role, "parts": [{"text": msg["content"]}]})
@@ -38,7 +45,7 @@ class GeminiProvider(LLMProvider):
             )
 
             full_response = ""
-            usage_meta = None
+            usage_meta: Any = None
 
             for chunk in stream:
                 text = chunk.text or ""
@@ -57,6 +64,7 @@ class GeminiProvider(LLMProvider):
             )
 
         except genai_errors.ClientError as e:
+            logger.debug("Gemini client error", exc_info=True)
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                 raise ProviderError(
                     "Gemini: Quota exceeded. Wait a few minutes or use --provider groq"
@@ -67,6 +75,8 @@ class GeminiProvider(LLMProvider):
                 ) from e
             raise ProviderError(f"Gemini error: {e}") from e
         except genai_errors.ServerError as e:
+            logger.debug("Gemini server error", exc_info=True)
             raise ProviderError(f"Gemini server error: {e}") from e
         except genai_errors.APIError as e:
+            logger.debug("Gemini API error", exc_info=True)
             raise ProviderError(f"Gemini API error: {e}") from e
